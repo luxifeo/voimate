@@ -1,0 +1,10 @@
+# environment
+.venv/
+__pycache__/
+*.pyc
+
+# competition data and everything derived from it (ASR caches, embeddings, runs, LLM call logs)
+data/
+*.zip
+outputs/
+logs/

@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM Lab</title>
+<style>
+:root {
+  --bg: #f6f6f3; --panel: #ffffff; --ink: #1c1c1a; --muted: #6a6a64; --line: #e2e1da; --accent: #2b59c3;
+  --ok: #1d6f45; --okbg: #e4f3ea; --bad: #a8261d; --badbg: #fbe8e5; --mid: #7a5200; --midbg: #fff2d6;
+  --code: #f0efea; --ins: #cdeed8; --del: #f7d6d2; --sel: #e8eefc;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141413; --panel: #1d1d1b; --ink: #ebeae4; --muted: #9a9992; --line: #32322e; --accent: #8aa9ff;
+    --ok: #74d19f; --okbg: #163322; --bad: #ff8f84; --badbg: #3b1c19; --mid: #f0c25e; --midbg: #392c10;
+    --code: #262624; --ins: #1b3d28; --del: #4a211d; --sel: #222c45;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--ink); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+input, select, textarea { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; }
+textarea { width: 100%; resize: vertical; font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+textarea.err { border-color: var(--bad); }
+code, pre, .mono { font: 12.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+pre { margin: 4px 0; padding: 6px 8px; background: var(--code); border-radius: 6px; white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow: auto; }
+details > summary { cursor: pointer; color: var(--muted); }
+.muted { color: var(--muted); }
+.sp { flex: 1; }
+
+header { position: sticky; top: 0; z-index: 5; display: flex; gap: 10px; align-items: center; padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+header h1 { font-size: 15px; margin: 0 8px 0 0; }
+header label { display: flex; gap: 6px; align-items: center; color: var(--muted); }
+#run { max-width: 420px; }
+#base { width: 230px; }
+#conn { font-size: 12px; }
+
+.layout { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 49px); }
+aside { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; background: var(--panel); }
+.filters { padding: 8px; display: grid; gap: 6px; border-bottom: 1px solid var(--line); }
+.filters .row { display: flex; gap: 6px; }
+.filters .row > * { flex: 1; min-width: 0; }
+#count { font-size: 12px; }
+#list { overflow: auto; flex: 1; }
+.item { padding: 7px 10px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.item:hover { background: var(--bg); }
+.item.active { background: var(--sel); }
+.item .r1 { display: flex; gap: 6px; align-items: center; }
+.item .sid { font-weight: 600; font-size: 13px; }
+.item .tx { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .meta { font-size: 11.5px; color: var(--muted); }
+
+.badge { display: inline-block; padding: 0 7px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.b-ok { background: var(--okbg); color: var(--ok); }
+.b-bad { background: var(--badbg); color: var(--bad); }
+.b-mid { background: var(--midbg); color: var(--mid); }
+.b-na { background: var(--code); color: var(--muted); }
+
+main { overflow: auto; min-height: 0; }
+.tabs { display: flex; gap: 4px; padding: 8px 16px 0; border-bottom: 1px solid var(--line); background: var(--bg); position: sticky; top: 0; z-index: 3; }
+.tabs button { border-radius: 6px 6px 0 0; border-bottom: none; }
+.tabs button.on { background: var(--panel); border-color: var(--line); font-weight: 600; }
+.view { padding: 14px 18px 40px; }
+.hidden { display: none !important; }
+
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+section > h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.head h2 { margin: 0; font-size: 18px; }
+.chip { font-size: 12px; padding: 1px 8px; border-radius: 10px; background: var(--code); }
+
+.tline { margin: 3px 0; }
+.tline b { display: inline-block; width: 60px; color: var(--muted); font-weight: 500; }
+del { background: var(--del); text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+ins { background: var(--ins); text-decoration: none; border-radius: 3px; padding: 0 2px; }
+
+.calls { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.call { border-left: 3px solid var(--line); padding: 4px 8px; margin: 4px 0; background: var(--bg); border-radius: 0 6px 6px 0; }
+.call.m { border-left-color: var(--ok); }
+.call.u { border-left-color: var(--bad); }
+.call .cname { font-weight: 600; }
+.call .kind { font-size: 11px; color: var(--muted); margin-left: 4px; }
+.call code { display: block; white-space: pre-wrap; word-break: break-word; }
+.call ul { margin: 4px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--bad); }
+
+.hist .turn { margin: 4px 0; }
+.role { display: inline-block; min-width: 72px; font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+
+.step { border: 1px solid var(--line); border-radius: 8px; margin: 10px 0; }
+.step-h { display: flex; gap: 8px; align-items: center; padding: 6px 10px; background: var(--bg); border-bottom: 1px solid var(--line); border-radius: 8px 8px 0 0; flex-wrap: wrap; }
+.step-b { padding: 8px 10px; }
+.step-b .lbl { font-size: 11.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; margin: 8px 0 2px; }
+.msgv { margin: 4px 0; }
+.tc { margin: 3px 0; }
+.tc .cname { font-weight: 600; }
+
+.pg { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+.pg-res { position: sticky; top: 50px; max-height: calc(100vh - 120px); overflow: auto; }
+.params { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.params label { display: grid; gap: 2px; font-size: 12px; color: var(--muted); }
+.params input, .params select { width: 100%; }
+.msg { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; margin: 8px 0; }
+.msg-h { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; font-size: 12px; }
+.msg.r-system { border-left: 3px solid #8a6cd6; }
+.msg.r-user { border-left: 3px solid var(--accent); }
+.msg.r-assistant { border-left: 3px solid var(--ok); }
+.msg.r-tool { border-left: 3px solid var(--mid); }
+.msg label { font-size: 11.5px; color: var(--muted); }
+.toolgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 10px; font-size: 12.5px; margin: 6px 0; }
+.toolgrid label { display: flex; gap: 6px; align-items: center; }
+.rcard { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; background: var(--panel); }
+.rcard.orig { border-style: dashed; }
+.rcard h4 { margin: 0 0 4px; font-size: 13px; }
+.same { color: var(--ok); font-size: 12px; } .diff { color: var(--bad); font-size: 12px; }
+.err { color: var(--bad); white-space: pre-wrap; }
+@media (max-width: 1100px) { .pg { grid-template-columns: 1fr; } .pg-res { position: static; max-height: none; } .calls { grid-template-columns: 1fr; } }
+@media (max-width: 760px) { .layout { grid-template-columns: 1fr; height: auto; } aside { max-height: 45vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>LLM Lab</h1>
+  <label>Run <select id="run"></select></label>
+  <label>vLLM <input id="base" value="http://localhost:8011/v1"></label>
+  <span id="conn" class="muted"></span>
+</header>
+<div class="layout">
+  <aside>
+    <div class="filters">
+      <input id="q" placeholder="Tìm id / transcript…">
+      <div class="row">
+        <select id="fscore">
+          <option value="all">Tất cả</option><option value="bad" selected>Score &lt; 1</option>
+          <option value="zero">Score = 0</option><option value="good">Score = 1</option>
+        </select>
+        <select id="fetype"><option value="">Mọi loại lỗi</option></select>
+      </div>
+      <div class="row">
+        <select id="fhist"><option value="">History: tất cả</option><option value="1">Có history</option><option value="0">Không history</option></select>
+        <select id="sort"><option value="id">Theo id</option><option value="score">Score tăng dần</option><option value="llm">Nhiều LLM call</option></select>
+      </div>
+      <div id="count" class="muted"></div>
+    </div>
+    <div id="list"></div>
+  </aside>
+  <main>
+    <div class="tabs">
+      <button data-tab="sample" class="on">Mẫu</button>
+      <button data-tab="pg">Playground</button>
+    </div>
+    <div id="v-sample" class="view"><p class="muted">Chọn một mẫu bên trái.</p></div>
+    <div id="v-pg" class="view hidden">
+      <div class="pg">
+        <div>
+          <section>
+            <div class="head"><h3 style="margin:0">Request</h3><span id="pg-src" class="muted"></span><span class="sp"></span>
+              <button id="pg-reset" title="Nạp lại request gốc từ log">Khôi phục gốc</button>
+              <button id="pg-rawbtn">JSON thô</button>
+              <button id="pg-send" class="primary" title="Ctrl+Enter">Gửi</button></div>
+          </section>
+          <div id="pg-form">
+            <section>
+              <h3>Tham số (để trống = không gửi)</h3>
+              <div class="params">
+                <label>model<input id="p-model" list="models"></label>
+                <label>temperature<input id="p-temperature" type="number" step="0.05"></label>
+                <label>top_p<input id="p-top_p" type="number" step="0.05"></label>
+                <label>top_k<input id="p-top_k" type="number" step="1"></label>
+                <label>max_tokens<input id="p-max_tokens" type="number" step="256"></label>
+                <label>seed<input id="p-seed" type="number" step="1"></label>
+                <label>presence_penalty<input id="p-presence_penalty" type="number" step="0.1"></label>
+                <label>repetition_penalty<input id="p-repetition_penalty" type="number" step="0.05"></label>
+                <label>tool_choice<select id="p-tool_choice"><option>auto</option><option>none</option><option>required</option></select></label>
+                <label>enable_thinking<select id="p-thinking"><option value="true">bật</option><option value="false">tắt</option></select></label>
+              </div>
+              <label class="muted" style="display:block;margin-top:8px;font-size:12px">Tham số khác (JSON, gộp vào body), ví dụ {"stop": ["</tool_call>"], "min_p": 0.05}
+                <textarea id="p-extra" rows="2" placeholder="{}"></textarea></label>
+              <datalist id="models"></datalist>
+            </section>
+            <section>
+              <div class="head"><h3 style="margin:0">Messages</h3><span id="pg-msgcount" class="muted"></span><span class="sp"></span>
+                <button data-add="system">+ system</button><button data-add="user">+ user</button>
+                <button data-add="assistant">+ assistant</button><button data-add="tool">+ tool</button></div>
+              <div id="pg-msgs"></div>
+            </section>
+            <section>
+              <details id="pg-tools-d">
+                <summary id="pg-tools-sum">Tools</summary>
+                <div style="margin-top:6px"><button id="tools-all">Bật hết</button> <button id="tools-none">Tắt hết</button></div>
+                <div id="pg-tools" class="toolgrid"></div>
+                <details><summary>Sửa JSON tools</summary><textarea id="pg-tools-json" rows="16"></textarea></details>
+              </details>
+            </section>
+          </div>
+          <section id="pg-rawbox" class="hidden">
+            <h3>Body JSON (gửi nguyên văn tới /chat/completions)</h3>
+            <textarea id="pg-raw" rows="40"></textarea>
+          </section>
+        </div>
+        <div class="pg-res">
+          <div id="pg-gold"></div>
+          <div id="pg-results"><p class="muted">Kết quả các lần gửi hiện ở đây, mới nhất ở trên.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const J = o => JSON.stringify(o);
+const JP = o => JSON.stringify(o, null, 2);
+const clone = o => JSON.parse(JSON.stringify(o));
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+  return r.json();
+}
+const ESHORT = { oos_called: 'OOS mà gọi tool', no_call: 'không gọi tool', over_ask: 'hỏi thừa', under_ask: 'thiếu hỏi',
+  ask_wrong: 'ask sai nội dung', write_missing_tool: 'thiếu write', write_wrong_args: 'write sai đối số',
+  write_extra: 'write thừa', read_only: 'chỉ lệch read', state_only: 'chỉ lệch state', other: 'khác' };
+const DIFFKIND = { missing_key: 'thiếu key', extra_key: 'thừa key', value: 'sai giá trị', fuzzy_low: 'fuzzy F1 ≤ 0.6' };
+const badge = s => s == null ? '<span class="badge b-na">–</span>'
+  : `<span class="badge ${s >= 1 ? 'b-ok' : s <= 0 ? 'b-bad' : 'b-mid'}">${(+s).toFixed(2)}</span>`;
+const fmtCall = (name, args) => `<span class="cname">${esc(name)}</span> <code>${esc(typeof args === 'string' ? args : J(args ?? {}))}</code>`;
+const writeStore = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+const readStore = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+
+const S = { runs: [], run: null, samples: [], labels: {}, cur: null, detail: null, filtered: [] };
+
+/* ---------------- runs & sample list ---------------- */
+function hashState() { return Object.fromEntries(new URLSearchParams(location.hash.slice(1))); }
+function setHash() { history.replaceState(null, '', `#run=${S.run.split}/${S.run.name}${S.cur ? '&id=' + S.cur : ''}`); }
+
+async function loadRuns() {
+  S.runs = await api('/api/runs');
+  $('#run').innerHTML = S.runs.map((r, i) => `<option value="${i}">${esc(r.split)}/${esc(r.name)}`
+    + `${r.score != null ? ' · ' + r.score : ''}${r.has_log ? ' · log' : ''}</option>`).join('');
+  const h = hashState();
+  let i = S.runs.findIndex(r => `${r.split}/${r.name}` === h.run);
+  if (i < 0) i = Math.max(0, S.runs.findIndex(r => r.has_log));
+  $('#run').value = i;
+  await selectRun(i, h.id);
+}
+
+async function selectRun(i, id) {
+  S.run = S.runs[i];
+  const d = await api(`/api/runs/${S.run.split}/${S.run.name}/samples`);
+  S.samples = d.samples; S.labels = d.labels;
+  const types = [...new Set(S.samples.map(s => s.etype).filter(Boolean))];
+  $('#fetype').innerHTML = '<option value="">Mọi loại lỗi</option>' + types.map(t =>
+    `<option value="${t}">${esc(ESHORT[t] || t)} (${S.samples.filter(s => s.etype === t).length})</option>`).join('');
+  if (S.samples[0] && S.samples[0].score == null) $('#fscore').value = 'all';
+  renderList();
+  const target = id && S.samples.find(s => s.id === id) ? id : S.filtered[0]?.id;
+  if (target) openSample(target);
+}
+
+function renderList() {
+  const q = $('#q').value.trim().toLowerCase(), fs = $('#fscore').value, fe = $('#fetype').value, fh = $('#fhist').value;
+  let xs = S.samples.filter(s =>
+    (!q || s.id.toLowerCase().includes(q) || (s.transcript || '').toLowerCase().includes(q))
+    && (fs === 'all' || s.score == null || (fs === 'bad' ? s.score < 1 : fs === 'zero' ? s.score <= 0 : s.score >= 1))
+    && (!fe || s.etype === fe) && (!fh || (fh === '1') === (s.history > 0)));
+  const sort = $('#sort').value;
+  if (sort === 'score') xs = [...xs].sort((a, b) => (a.score ?? 9) - (b.score ?? 9));
+  if (sort === 'llm') xs = [...xs].sort((a, b) => b.n_llm - a.n_llm);
+  S.filtered = xs;
+  const scored = S.samples.filter(s => s.score != null);
+  const mean = scored.length ? (100 * scored.reduce((a, s) => a + s.score, 0) / scored.length).toFixed(2) : '–';
+  const lost = scored.length ? (100 * xs.filter(s => s.score != null).reduce((a, s) => a + 1 - s.score, 0) / scored.length).toFixed(2) : '–';
+  $('#count').textContent = `${xs.length}/${S.samples.length} mẫu · điểm run ${mean} · nhóm đang lọc mất ${lost} điểm`;
+  $('#list').innerHTML = xs.map(s => `<div class="item${s.id === S.cur ? ' active' : ''}" data-id="${s.id}">
+    <div class="r1"><span class="sid">${esc(s.id)}</span>${badge(s.score)}<span class="sp"></span>
+      <span class="muted" style="font-size:11.5px">${s.etype ? esc(ESHORT[s.etype] || s.etype) : ''}</span></div>
+    <div class="tx">${esc(s.transcript)}</div>
+    <div class="meta">${s.n_llm} LLM call · ${s.n_calls} tool call · ${esc(s.stop || '')}${s.history ? ' · history ' + s.history : ''}${s.error ? ' · LỖI' : ''}</div>
+  </div>`).join('');
+}
+
+/* ---------------- sample view ---------------- */
+async function openSample(id) {
+  S.cur = id; setHash();
+  document.querySelectorAll('.item').forEach(el => el.classList.toggle('active', el.dataset.id === id));
+  $('.item.active')?.scrollIntoView({ block: 'nearest' });
+  const d = await api(`/api/runs/${S.run.split}/${S.run.name}/samples/${id}`);
+  if (S.cur !== id) return;
+  S.detail = d;
+  renderSample(d);
+  showTab('sample');
+}
+
+function renderMsg(m) {
+  const role = `<span class="role">${esc(m.role)}</span>`;
+  let body = '';
+  if (typeof m.content === 'string') body = m.content ? `<pre>${esc(m.content)}</pre>` : '';
+  else if (m.content != null) body = `<pre>${esc(JP(m.content))}</pre>`;
+  const tcs = (m.tool_calls || []).map(c => `<div class="tc">→ ${fmtCall(c.function.name, c.function.arguments)} <span class="muted">${esc(c.id || '')}</span></div>`).join('');
+  const rs = m.reasoning_content || m.reasoning;
+  return `<div class="msgv">${role}${m.tool_call_id ? `<span class="muted">${esc(m.tool_call_id)}</span>` : ''}
+    ${rs ? `<details><summary>reasoning (${rs.length} ký tự)</summary><pre>${esc(rs)}</pre></details>` : ''}${body}${tcs}</div>`;
+}
+
+function renderOutput(res) {
+  const ch = res?.choices?.[0], m = ch?.message || {};
+  const rs = m.reasoning_content ?? m.reasoning;
+  const u = res?.usage || {};
+  return {
+    meta: `${u.prompt_tokens ?? '?'} → ${u.completion_tokens ?? '?'} tok · finish ${esc(ch?.finish_reason ?? '?')}`,
+    html: `${rs ? `<details><summary>reasoning (${rs.length} ký tự)</summary><pre>${esc(rs)}</pre></details>` : '<div class="muted">(không có reasoning)</div>'}
+      ${m.content ? `<pre>${esc(m.content)}</pre>` : ''}
+      ${(m.tool_calls || []).map(c => `<div class="tc">→ ${fmtCall(c.function.name, c.function.arguments)}</div>`).join('') || (m.content ? '' : '<div class="muted">(rỗng)</div>')}`,
+    calls: (m.tool_calls || []).map(c => c.function.name + ' ' + c.function.arguments).sort(),
+  };
+}
+
+function renderSample(d) {
+  const s = d.score;
+  const head = `<section><div class="head"><h2>${esc(d.id)}</h2>${badge(s?.score)}
+    ${s ? `<span class="chip">P ${(+s.precision).toFixed(2)}</span><span class="chip">R ${(+s.recall).toFixed(2)}</span>
+    <span class="chip">state ${s.state_ok ? 'khớp' : 'LỆCH'}</span><span class="chip">${esc(s.category)}</span>` : ''}
+    ${d.etype ? `<span class="chip">${esc(S.labels[d.etype] || d.etype)}</span>` : ''}
+    <span class="chip">stop: ${esc(d.stop || '–')}</span>${d.error ? `<span class="chip b-bad">${esc(d.error)}</span>` : ''}</div>
+    <div class="muted" style="margin-top:6px;font-size:12.5px">${esc(d.context.current_time)} · apps: ${esc(Object.keys(d.context.installed_apps).join(', '))}
+      · profile ${esc(J(d.context.user_profile || {}))}</div></section>`;
+
+  const trans = `<section><h3>Lời người dùng (lượt cuối)</h3>
+    ${d.gold_text != null ? `<div class="tline"><b>Gold</b>${esc(d.gold_text)}</div>` : ''}
+    ${d.word_diff ? `<div class="tline"><b>Model</b>${d.word_diff.map(([r, h]) => r === h ? esc(h)
+        : r && h ? `<del>${esc(r)}</del><ins>${esc(h)}</ins>` : r ? `<del>${esc(r)}</del>` : `<ins>${esc(h)}</ins>`).join(' ')}</div>
+      <div class="muted" style="font-size:12px">so khớp không phân biệt hoa thường; <del>gạch</del> = từ gold bị mất/thay, <ins>xanh</ins> = từ model nhận được</div>`
+      : `<div class="tline"><b>Model</b>${esc(d.transcript ?? '')}</div>`}</section>`;
+
+  const hist = d.history.length ? `<section class="hist"><h3>History (${d.history.length} lượt, gold)</h3>${d.history.map(t => t.role === 'user'
+      ? `<div class="turn"><span class="role">user</span>${esc(t.audio_text ?? '(chưa có transcript)')}</div>`
+      : `<div class="turn">${(t.tool_calls || []).map((c, i) => `<div class="tc"><span class="role">call</span>${fmtCall(c.name, c.arguments)}
+          <details style="display:inline-block"><summary>kết quả</summary><pre>${esc(JP((t.tool_results || [])[i]))}</pre></details></div>`).join('')}
+        <span class="role">assistant</span>${esc(t.text || '')}</div>`).join('')}</section>` : '';
+
+  const kinds = d.kinds || {};
+  const goldHtml = d.gold ? d.gold.map((c, i) => `<div class="call ${c.matched ? 'm' : 'u'}">${fmtCall(c.name, c.arguments)}<span class="kind">${esc(kinds[c.name] || '')}</span>
+      <details><summary>kết quả gold</summary><pre>${esc(JP(d.gold_results?.[i]))}</pre></details></div>`).join('') || '<div class="muted">[] (out-of-scope)</div>' : '';
+  const predHtml = d.pred.map(c => `<div class="call ${d.gold ? (c.match != null ? 'm' : 'u') : ''}">${fmtCall(c.name, c.arguments)}<span class="kind">${esc(kinds[c.name] || '')}</span>
+      ${c.diff?.length ? `<ul>${c.diff.map(([k, key, g, p]) => `<li>${esc(key)}: ${DIFFKIND[k] || k} · gold ${esc(J(g))} · model ${esc(J(p))}</li>`).join('')}</ul>` : ''}</div>`).join('') || '<div class="muted">[]</div>';
+  const calls = `<section><h3>Tool call (xanh = khớp, đỏ = không khớp)</h3><div class="calls">
+    ${d.gold ? `<div><div class="muted">Gold (${d.gold.length})</div>${goldHtml}</div>` : ''}
+    <div><div class="muted">Model (${d.pred.length})</div>${predHtml}</div></div></section>`;
+
+  let steps;
+  if (d.llm_calls.length) {
+    steps = d.llm_calls.map((c, k) => {
+      const msgs = c.request.messages || [];
+      const prevLen = k ? (d.llm_calls[k - 1].request.messages || []).length + 1 : 0;
+      const added = msgs.slice(prevLen);
+      const input = k === 0
+        ? `<details><summary>system prompt (${(msgs[0]?.content || '').length} ký tự)</summary><pre>${esc(msgs[0]?.content)}</pre></details>${added.slice(1).map(renderMsg).join('')}`
+        : added.map(renderMsg).join('') || '<div class="muted">(không có message mới)</div>';
+      const out = c.response ? renderOutput(c.response) : { meta: '', html: `<div class="err">${esc(c.error)}</div>` };
+      const res = k === d.llm_calls.length - 1 && d.trace[k]?.results
+        ? `<div class="lbl">Kết quả thực thi (rút gọn 400 ký tự)</div>${d.trace[k].results.map(r => `<pre>${esc(r)}</pre>`).join('')}` : '';
+      return `<div class="step"><div class="step-h"><b>Bước ${c.step}</b><span class="muted">${c.latency_s}s · ${out.meta}</span>
+          <span class="muted">${msgs.length} messages · ${(c.request.tools || []).length} tools</span><span class="sp"></span>
+          <button data-replay="${k}">Sửa & gọi lại</button></div>
+        <div class="step-b"><div class="lbl">Input ${k ? 'mới thêm từ bước trước' : ''}</div>${input}
+          <div class="lbl">Output</div>${out.html}${res}
+          <details><summary>request / response JSON đầy đủ</summary><pre>${esc(JP({ request: { ...c.request, tools: `[${(c.request.tools || []).length} tools]` }, response: c.response, error: c.error }))}</pre></details></div></div>`;
+    }).join('');
+  } else {
+    steps = `<div class="muted">Run này không có llm_calls.jsonl, chỉ có trace rút gọn. Chạy lại bằng scripts/run_agent.py để có log đầy đủ.</div>`
+      + d.trace.map((t, k) => `<div class="step"><div class="step-h"><b>Bước ${k}</b></div><div class="step-b">
+        ${t.reasoning ? `<details><summary>reasoning (${t.reasoning.length} ký tự)</summary><pre>${esc(t.reasoning)}</pre></details>` : ''}
+        ${t.content ? `<pre>${esc(t.content)}</pre>` : ''}${(t.calls || []).map(([n, a]) => `<div class="tc">→ ${fmtCall(n, a)}</div>`).join('')}
+        ${(t.results || []).map(r => `<pre>${esc(r)}</pre>`).join('')}</div></div>`).join('');
+  }
+  $('#v-sample').innerHTML = head + trans + hist + calls + `<section><h3>LLM call (${d.llm_calls.length})</h3>${steps}</section>`;
+}
+
+/* ---------------- playground ---------------- */
+const NUM = ['temperature', 'top_p', 'top_k', 'max_tokens', 'seed', 'presence_penalty', 'repetition_penalty'];
+const PG = { body: null, tools: [], on: new Set(), orig: null, source: null, gold: null, kinds: {}, raw: false, initial: null };
+
+function loadPlayground(body, orig, source, gold) {
+  PG.initial = { body: clone(body), orig, source, gold };
+  PG.orig = orig; PG.source = source; PG.gold = gold;
+  setBody(body);
+  if (PG.raw) toggleRaw();
+  $('#pg-src').textContent = source ? `${source.run} · ${source.sample_id} · bước ${source.step}` : 'request mới';
+  $('#pg-gold').innerHTML = gold ? `<div class="rcard"><h4>Gold của mẫu</h4>${gold.map(c => `<div class="tc">${fmtCall(c.name, c.arguments)}</div>`).join('') || '<div class="muted">[]</div>'}</div>` : '';
+  $('#pg-results').innerHTML = orig ? resultCard(orig, null, 'Gốc (trong log)', true) : '';
+  showTab('pg');
+}
+
+function setBody(body) {
+  PG.body = clone(body);
+  PG.tools = PG.body.tools || []; delete PG.body.tools;
+  PG.on = new Set(PG.tools.map(t => t.function?.name));
+  $('#p-model').value = PG.body.model ?? '';
+  NUM.forEach(k => { $('#p-' + k).value = PG.body[k] ?? ''; });
+  $('#p-tool_choice').value = PG.body.tool_choice ?? 'auto';
+  $('#p-thinking').value = String(!!PG.body.chat_template_kwargs?.enable_thinking);
+  $('#p-extra').value = '';
+  renderMsgs(); renderTools();
+  checkModel();
+}
+
+function buildBody() {
+  const b = clone(PG.body);
+  b.model = $('#p-model').value.trim();
+  NUM.forEach(k => { const v = $('#p-' + k).value.trim(); if (v === '') delete b[k]; else b[k] = Number(v); });
+  b.chat_template_kwargs = { ...(b.chat_template_kwargs || {}), enable_thinking: $('#p-thinking').value === 'true' };
+  const tools = PG.tools.filter(t => PG.on.has(t.function?.name));
+  if (tools.length) { b.tools = tools; b.tool_choice = $('#p-tool_choice').value; } else { delete b.tool_choice; }
+  const extra = $('#p-extra').value.trim();
+  if (extra) Object.assign(b, JSON.parse(extra));
+  return b;
+}
+
+function rowsFor(v) { return Math.min(26, Math.max(2, v.split('\n').length + Math.floor(v.length / 160))); }
+
+function renderMsgs() {
+  const ms = PG.body.messages || (PG.body.messages = []);
+  $('#pg-msgcount').textContent = `${ms.length} messages`;
+  $('#pg-msgs').innerHTML = ms.map((m, i) => {
+    const content = typeof m.content === 'string' || m.content == null ? (m.content ?? '') : JP(m.content);
+    const rs = m.reasoning_content ?? m.reasoning;
+    return `<div class="msg r-${esc(m.role)}" data-i="${i}">
+      <div class="msg-h"><select class="m-role">${['system', 'user', 'assistant', 'tool'].map(r => `<option${r === m.role ? ' selected' : ''}>${r}</option>`).join('')}</select>
+        <span class="muted">#${i} · ${content.length} ký tự${typeof m.content === 'object' && m.content ? ' · content dạng JSON' : ''}</span>
+        ${m.role === 'tool' ? `<label>tool_call_id <input class="m-tcid" value="${esc(m.tool_call_id || '')}" size="14"></label>` : ''}
+        <span class="sp"></span><button data-act="trunc" title="Xoá mọi message sau message này">Cắt phía sau</button><button data-act="del">Xoá</button></div>
+      <textarea class="m-content" rows="${rowsFor(content)}">${esc(content)}</textarea>
+      ${m.role === 'assistant' ? `<details><summary>reasoning (${(rs || '').length} ký tự, gửi lại trong history)</summary>
+        <textarea class="m-reasoning" rows="${rowsFor(rs || '')}">${esc(rs || '')}</textarea></details>
+        <label>tool_calls (JSON)</label><textarea class="m-toolcalls" rows="${rowsFor(m.tool_calls ? JP(m.tool_calls) : '')}">${esc(m.tool_calls ? JP(m.tool_calls) : '')}</textarea>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function renderTools() {
+  $('#pg-tools-sum').textContent = `Tools: ${PG.on.size}/${PG.tools.length} bật`;
+  $('#pg-tools').innerHTML = PG.tools.map(t => `<label><input type="checkbox" data-tool="${esc(t.function?.name)}"${PG.on.has(t.function?.name) ? ' checked' : ''}>${esc(t.function?.name)}</label>`).join('');
+  $('#pg-tools-json').value = JP(PG.tools);
+}
+
+function onMsgEdit(e) {
+  const card = e.target.closest('.msg'); if (!card) return;
+  const m = PG.body.messages[+card.dataset.i], t = e.target;
+  if (t.classList.contains('m-role')) { m.role = t.value; renderMsgs(); return; }
+  if (t.classList.contains('m-tcid')) m.tool_call_id = t.value;
+  if (t.classList.contains('m-content')) {
+    if (typeof m.content === 'object' && m.content) {
+      try { m.content = JSON.parse(t.value); t.classList.remove('err'); } catch (_) { t.classList.add('err'); }
+    } else m.content = t.value;
+  }
+  if (t.classList.contains('m-reasoning')) {
+    if (t.value) { m.reasoning = m.reasoning_content = t.value; } else { delete m.reasoning; delete m.reasoning_content; }
+  }
+  if (t.classList.contains('m-toolcalls')) {
+    if (!t.value.trim()) { delete m.tool_calls; t.classList.remove('err'); }
+    else { try { m.tool_calls = JSON.parse(t.value); t.classList.remove('err'); } catch (_) { t.classList.add('err'); } }
+  }
+}
+
+function toggleRaw() {
+  if (!PG.raw) {
+    try { $('#pg-raw').value = JP(buildBody()); } catch (e) { alert('JSON tham số khác bị lỗi: ' + e.message); return; }
+  } else {
+    try { setBody(JSON.parse($('#pg-raw').value)); } catch (e) { alert('Body JSON lỗi: ' + e.message); return; }
+  }
+  PG.raw = !PG.raw;
+  $('#pg-form').classList.toggle('hidden', PG.raw);
+  $('#pg-rawbox').classList.toggle('hidden', !PG.raw);
+  $('#pg-rawbtn').textContent = PG.raw ? 'Form' : 'JSON thô';
+}
+
+function paramSummary(b) {
+  const p = [b.model, `T=${b.temperature ?? '–'}`, `max=${b.max_tokens ?? '–'}`, `think=${b.chat_template_kwargs?.enable_thinking ? 'bật' : 'tắt'}`];
+  ['top_p', 'top_k', 'seed', 'presence_penalty', 'repetition_penalty'].forEach(k => b[k] != null && p.push(`${k}=${b[k]}`));
+  p.push(`${(b.messages || []).length} msg`, `${(b.tools || []).length} tools`);
+  return p.join(' · ');
+}
+
+function resultCard(res, latency, title, orig = false, body = null) {
+  const o = renderOutput(res);
+  let cmp = '';
+  if (!orig && PG.orig) {
+    const same = J(o.calls) === J(renderOutput(PG.orig).calls);
+    cmp = `<span class="${same ? 'same' : 'diff'}">${same ? 'tool call giống gốc' : 'tool call KHÁC gốc'}</span>`;
+  }
+  return `<div class="rcard${orig ? ' orig' : ''}"><h4>${esc(title)}</h4>
+    <div class="muted" style="font-size:12px">${latency != null ? latency + 's · ' : ''}${o.meta} ${cmp}</div>
+    ${body ? `<div class="muted" style="font-size:12px">${esc(paramSummary(body))}</div>` : ''}${o.html}</div>`;
+}
+
+let nSent = 0;
+async function send() {
+  let body;
+  try { body = PG.raw ? JSON.parse($('#pg-raw').value) : buildBody(); } catch (e) { alert('JSON lỗi: ' + e.message); return; }
+  const id = 'r' + (++nSent);
+  const holder = document.createElement('div');
+  holder.id = id;
+  holder.innerHTML = `<div class="rcard"><h4>Lần gửi #${nSent}</h4><div class="muted">${esc(paramSummary(body))}</div><div class="muted">đang chờ…</div></div>`;
+  const origCard = $('#pg-results .rcard.orig');
+  origCard ? origCard.after(holder) : $('#pg-results').prepend(holder);
+  try {
+    const r = await api('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base_url: $('#base').value, body, source: PG.source }) });
+    holder.innerHTML = resultCard(r.response, r.latency_s, `Lần gửi #${id.slice(1)}`, false, body);
+  } catch (e) {
+    holder.innerHTML = `<div class="rcard"><h4>Lần gửi #${id.slice(1)}</h4><div class="err">${esc(e.message)}</div></div>`;
+  }
+}
+
+/* ---------------- vLLM connection ---------------- */
+let served = [];
+async function checkConn() {
+  const base = $('#base').value.trim();
+  writeStore('lab.base', base);
+  try {
+    served = await api('/api/models?base_url=' + encodeURIComponent(base));
+    $('#conn').textContent = 'vLLM đang phục vụ: ' + served.join(', ');
+    $('#models').innerHTML = served.map(m => `<option value="${esc(m)}">`).join('');
+  } catch (e) {
+    served = [];
+    $('#conn').textContent = 'không kết nối được vLLM tại ' + base;
+  }
+  checkModel();
+}
+function checkModel() {
+  const m = $('#p-model').value.trim();
+  $('#p-model').style.borderColor = m && served.length && !served.includes(m) ? 'var(--bad)' : '';
+  $('#p-model').title = m && served.length && !served.includes(m) ? `vLLM đang phục vụ ${served.join(', ')}, không phải ${m}` : '';
+}
+
+/* ---------------- wiring ---------------- */
+function showTab(t) {
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  $('#v-sample').classList.toggle('hidden', t !== 'sample');
+  $('#v-pg').classList.toggle('hidden', t !== 'pg');
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  if (b.dataset.tab === 'pg' && !PG.body) loadPlayground({ model: served[0] || '', temperature: 0, max_tokens: 1024,
+    messages: [{ role: 'system', content: '' }, { role: 'user', content: '' }], chat_template_kwargs: { enable_thinking: false } }, null, null, null);
+  showTab(b.dataset.tab);
+});
+$('#run').onchange = e => { S.cur = null; selectRun(+e.target.value); };
+['#q', '#fscore', '#fetype', '#fhist', '#sort'].forEach(s => $(s).addEventListener('input', renderList));
+$('#list').onclick = e => { const it = e.target.closest('.item'); if (it) openSample(it.dataset.id); };
+$('#v-sample').onclick = e => {
+  const b = e.target.closest('[data-replay]'); if (!b) return;
+  const c = S.detail.llm_calls[+b.dataset.replay];
+  loadPlayground(c.request, c.response, { run: `${S.run.split}/${S.run.name}`, sample_id: S.detail.id, step: c.step }, S.detail.gold);
+};
+$('#pg-msgs').addEventListener('input', onMsgEdit);
+$('#pg-msgs').addEventListener('change', onMsgEdit);
+$('#pg-msgs').onclick = e => {
+  const act = e.target.dataset.act; if (!act) return;
+  const i = +e.target.closest('.msg').dataset.i;
+  if (act === 'del') PG.body.messages.splice(i, 1);
+  if (act === 'trunc') PG.body.messages.length = i + 1;
+  renderMsgs();
+};
+document.querySelectorAll('[data-add]').forEach(b => b.onclick = () => {
+  const r = b.dataset.add;
+  PG.body.messages.push(r === 'tool' ? { role: 'tool', tool_call_id: '', content: '' } : { role: r, content: '' });
+  renderMsgs();
+});
+$('#pg-tools').onchange = e => {
+  const n = e.target.dataset.tool; if (!n) return;
+  e.target.checked ? PG.on.add(n) : PG.on.delete(n);
+  $('#pg-tools-sum').textContent = `Tools: ${PG.on.size}/${PG.tools.length} bật`;
+};
+$('#tools-all').onclick = () => { PG.on = new Set(PG.tools.map(t => t.function?.name)); renderTools(); };
+$('#tools-none').onclick = () => { PG.on = new Set(); renderTools(); };
+$('#pg-tools-json').onchange = e => {
+  try { PG.tools = JSON.parse(e.target.value); e.target.classList.remove('err');
+    const names = new Set(PG.tools.map(t => t.function?.name)); PG.on = new Set([...PG.on].filter(n => names.has(n)));
+    renderTools(); } catch (_) { e.target.classList.add('err'); }
+};
+$('#pg-send').onclick = send;
+$('#pg-rawbtn').onclick = toggleRaw;
+$('#pg-reset').onclick = () => PG.initial && loadPlayground(PG.initial.body, PG.initial.orig, PG.initial.source, PG.initial.gold);
+$('#p-model').addEventListener('input', checkModel);
+$('#base').onchange = checkConn;
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !$('#v-pg').classList.contains('hidden')) { e.preventDefault(); send(); return; }
+  if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'j' || e.key === 'k') {
+    const i = S.filtered.findIndex(s => s.id === S.cur);
+    const n = S.filtered[i + (e.key === 'ArrowDown' || e.key === 'j' ? 1 : -1)];
+    if (n) { e.preventDefault(); openSample(n.id); }
+  }
+});
+
+$('#base').value = readStore('lab.base') || $('#base').value;
+checkConn();
+loadRuns().catch(e => { $('#v-sample').innerHTML = `<div class="err">${esc(e.message)}</div>`; });
+</script>
+</body>
+</html>

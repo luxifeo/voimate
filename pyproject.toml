@@ -1,0 +1,32 @@
+[project]
+name = "lifemate"
+version = "0.1.0"
+description = "Zalo AI Challenge 2026 LifeMate baseline: Gemma-4-E2B ASR + tool-calling agent"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "openai>=1.60",
+    "numpy>=1.26",
+    "tqdm>=4.66",
+    "huggingface_hub[hf_transfer]>=0.30",
+    "sentence-transformers>=3.4",
+    "torch>=2.5",
+    "sherpa-onnx>=2.0.1",
+    "soundfile>=0.14.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true
+
+[dependency-groups]
+lab = [
+    "fastapi>=0.162.0",
+    "uvicorn>=0.54.0",
+]
