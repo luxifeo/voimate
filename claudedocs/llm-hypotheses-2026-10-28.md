@@ -109,11 +109,56 @@ Mọi cờ đều tắt mặc định. Với cấu hình mặc định, request 
 
 `param_usage_notes` trong thí nghiệm được tính từ 1,245 mẫu train ngoài dev 300. Khi nộp bài thì tính từ toàn bộ train.
 
-## Đề xuất (chưa áp dụng vào predict.py, cần bạn duyệt)
+## Đề xuất
 
-1. Bật `arg_guide` + `fewshot 8` + `date_table weeks` trong đường nộp bài. Việc này cần sửa `predict.py` và `AgentConfig`, kèm build lại Docker.
+1. Bật `arg_guide` + `fewshot 8` + `date_table weeks` trong đường nộp bài. Đã áp dụng ngày 2026-10-29, xem mục Submission bên dưới.
 2. Không lọc tool, không tóm tắt history, không dùng calculator, không khử nhiễu ASR. Nếu cần tốc độ thì lọc tool thực tế là lựa chọn duy nhất không làm giảm điểm.
 3. Hai nhóm lỗi lớn còn lại (gold, cấu hình kết hợp):
    - write call sai đối số: 10.8 điểm mất;
    - read call lệch: 6.7 điểm mất.
 4. Chênh lệch gold và ASR vẫn khoảng 20 điểm. Phần lớn do lỗi tên riêng và từ tiếng Anh trong ASR, không do nhiễu.
+
+## Submission (2026-10-29, branch `feature/combo-submission`)
+
+Cấu hình: gipformer 1.5 ASR + Qwen3.5-4B, `--fewshot 8 --arg-guide --date-table weeks`, `max_tokens` 4096, thinking. `param_usage_notes` tính từ toàn bộ 1,545 mẫu train.
+
+### File nộp public_test
+
+- Đường dẫn: `outputs/runs/public_test/c1_combo_gip15/submission.jsonl`, sinh bằng `scripts/run_agent.py` trên server vLLM dev.
+- Kết quả chạy: 634 dòng, 0 lỗi schema (`zaic_tools --validate`), 0 lỗi agent, 4.43 s/sample.
+- So với run public trước (`qwen35_4b_gip15`): cùng state_hash 476/634, cùng tool call 253/634.
+
+### Docker `lifemate-submission:combo`
+
+| File | Thay đổi |
+|---|---|
+| `scripts/predict.py` | ASR gipformer, 8 few-shot, `param_usage_notes`, `AgentConfig(date_table="weeks", arg_guide=True, max_tokens=4096)` |
+| `docker/entrypoint.sh` | vLLM phục vụ Qwen3.5-4B: `--max-model-len 16384`, parser `qwen3_coder`/`qwen3`, `--seed 0` |
+| `docker/fetch_models.py` | tải weights pin revision, ghi `refs/main` để chạy offline |
+| `Dockerfile` | thêm sherpa-onnx 2.0.1, scipy, scikit-learn; bỏ thư viện audio của Gemma |
+
+Entrypoint cũ đặt `--max-model-len 32768`, vượt giới hạn context 16,384 của rule.md. Bản mới đặt 16384.
+
+Số tham số (đếm từ checkpoint):
+
+| Model | Tham số |
+|---|---|
+| Qwen3.5-4B (LM 4.21B + vision 0.33B + MTP 0.12B) | 4.66B |
+| bge-m3 | 0.57B |
+| gipformer | 0.07B |
+| **Tổng** | **khoảng 5.3B** |
+
+### Smoke test Docker
+
+Cấu hình: `--network none`, `--limit 40`, GPU0, `GPU_UTIL=0.75`.
+
+| Hạng mục | Kết quả |
+|---|---|
+| Lỗi | 0 lỗi agent |
+| Thời gian | 226 s pipeline; tổng 445 s gồm cả khởi động vLLM |
+| ASR | trùng 95/95 transcript với `outputs/asr/public_test_gip15.json` |
+| Agent so với file nộp ở trên | cùng state_hash 34/40, cùng tool call 27/40 |
+
+Các mẫu lệch khác nhau ở quyết định của model (chọn chuyến bay, hỏi lại hay thực hiện), không lệch ngày giờ.
+
+Trên máy dev, GPU0 có sẵn một `tritonserver` khác chiếm 3.5 GB. Vì vậy mức mặc định `GPU_UTIL=0.85` không khởi động được, phải truyền `-e GPU_UTIL=0.75` lúc chạy.

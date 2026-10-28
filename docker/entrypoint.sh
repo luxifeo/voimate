@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Submission entrypoint: start vLLM for Gemma-4-E2B-it, wait until it serves, run the pipeline on one split.
+# Submission entrypoint: start vLLM for Qwen3.5-4B, wait until it serves, run the pipeline on one split.
 #   DATA_ROOT    folder holding the split folders (default /data)
 #   SPLIT        split to predict (default private_test)
 #   OUTPUT_PATH  submission file (default /output/submission.jsonl)
@@ -11,17 +11,18 @@ SPLIT="${SPLIT:-private_test}"
 OUTPUT_PATH="${OUTPUT_PATH:-/output/submission.jsonl}"
 PORT=8011
 
-vllm serve google/gemma-4-E2B-it \
-  --served-model-name gemma-4-e2b \
+vllm serve Qwen/Qwen3.5-4B \
+  --served-model-name qwen3.5-4b \
   --port "$PORT" \
-  --max-model-len 32768 \
+  --max-model-len 16384 \
   --gpu-memory-utilization "${GPU_UTIL:-0.85}" \
   --max-num-seqs 64 \
+  --seed 0 \
   --enable-prefix-caching \
   --enable-auto-tool-choice \
-  --tool-call-parser gemma4 \
-  --reasoning-parser gemma4 \
-  --limit-mm-per-prompt '{"image": 0, "audio": 1}' > /tmp/vllm.log 2>&1 &
+  --tool-call-parser qwen3_coder \
+  --reasoning-parser qwen3 \
+  --limit-mm-per-prompt '{"image": 0, "video": 0}' > /tmp/vllm.log 2>&1 &
 VLLM_PID=$!
 
 until python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT}/v1/models', timeout=2)" 2>/dev/null; do

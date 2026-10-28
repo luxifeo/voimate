@@ -3,6 +3,7 @@
 !lifemate/
 !scripts/predict.py
 !docker/entrypoint.sh
+!docker/fetch_models.py
 !data/train+public_test/train/train.jsonl
 !outputs/index/train_bge-m3_1545.npy
 **/__pycache__
