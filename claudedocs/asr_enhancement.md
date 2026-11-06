@@ -203,3 +203,31 @@ uv run python scripts/bench_enhance.py report --examples htdemucs
 ```
 
 Model ONNX: `https://github.com/k2-fsa/sherpa-onnx/releases/download/speech-enhancement-models/{gtcrn_simple,dpdfnet2,dpdfnet8}.onnx` → `outputs/asr/enhanced/models/`.
+
+## 9. Làm chậm audio trước ASR (2026-10-29)
+
+Script: `scripts/bench_tempo.py`. Clip set: dev 300 (983 clip). Audio được biến đổi bằng ffmpeg rồi đưa vào recognizer gipformer production. Transcript của `raw` trùng 983/983 với `outputs/asr/train_gip15.json`.
+
+| Cách | WER all | final | history | clip tốt hơn / tệ hơn so với raw |
+|---|---|---|---|---|
+| raw | **17.12** | 16.80 | 17.42 | - |
+| atempo 0.9 (giữ cao độ) | 17.63 | 17.47 | 17.79 | 154 / 195 |
+| atempo 0.8 | 18.67 | 18.53 | 18.80 | 144 / 265 |
+| atempo 0.7 | 19.48 | 19.03 | 19.90 | 139 / 296 |
+| rubberband 0.8 | 19.73 | 19.31 | 20.12 | 149 / 325 |
+| speed 0.9 (hạ cao độ) | 17.16 | 16.65 | 17.63 | 181 / 180 |
+
+WER theo tốc độ nói (chia 3 nhóm bằng nhau theo số từ/giây của reference; ngưỡng 2.63 và 3.18 từ/s):
+
+| Cách | chậm | vừa | nhanh |
+|---|---|---|---|
+| raw | 18.70 | 17.16 | 16.11 |
+| atempo 0.9 | 18.92 | 17.30 | 17.08 |
+| speed 0.9 | 19.40 | 16.96 | 15.92 |
+
+Kết luận: làm chậm audio không giảm WER.
+
+- Giãn thời gian giữ cao độ làm WER tăng 0.5–2.6 điểm. Mức tăng xảy ra ở cả nhóm nói nhanh.
+- Làm chậm kèm hạ cao độ cho kết quả ngang raw: số clip tốt hơn và tệ hơn gần bằng nhau (181 / 180).
+- Chỉ làm chậm các clip nói nhanh (ước lượng tốc độ từ transcript raw) tốt nhất được 17.06, so với raw 17.12. Ngưỡng này lại chọn trên chính tập đo, nên chưa đủ làm bằng chứng.
+- Nhóm nói nhanh vốn có WER thấp nhất. Vì vậy tốc độ nói không phải nguồn lỗi chính.
