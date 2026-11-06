@@ -66,6 +66,8 @@ def main() -> None:
     ap.add_argument("--arg-guide", action="store_true")
     ap.add_argument("--history-mode", choices=["messages", "summary", "llm_summary"], default="messages")
     ap.add_argument("--calculator", action="store_true")
+    ap.add_argument("--notes-folds", type=int, default=0,
+                    help="train + --arg-guide: usage notes per fold from the rows outside it (0 = from rows outside the evaluated subset)")
     args = ap.parse_args()
 
     rows = load_split(args.split)
@@ -91,15 +93,27 @@ def main() -> None:
                  for a in json.loads((DATA_ROOT / args.split / f"{args.split}_tools_catalog.json").read_text(encoding="utf-8"))["apps"]}
     tool_apps = build_tool_filters(rows, transcripts, retriever, args.tool_filter, exclude_self=args.split == "train",
                                    k=args.filter_k, app_descs=app_descs, top_apps=args.filter_top_apps)
-    # usage notes from labelled train rows outside the evaluated subset
+    # usage notes from labelled train rows outside the evaluated subset, or outside the sample's fold (--notes-folds)
     evaluated = {r["id"] for r in rows} if args.split == "train" else set()
-    param_notes = param_usage_notes([r for r in train_rows if r["id"] not in evaluated], catalog) if args.arg_guide else None
+    param_notes = param_notes_by_id = None
+    if args.arg_guide and args.split == "train" and args.notes_folds:
+        ids = sorted(evaluated)
+        random.Random(0).shuffle(ids)
+        param_notes_by_id = {}
+        for k in range(args.notes_folds):
+            fold = set(ids[k::args.notes_folds])
+            notes = param_usage_notes([r for r in train_rows if r["id"] not in fold], catalog)
+            param_notes_by_id.update({i: notes for i in fold})
+    elif args.arg_guide:
+        if len(evaluated) == len(train_rows):
+            sys.exit("--arg-guide on the whole train split leaves no rows for usage notes; add --notes-folds 5")
+        param_notes = param_usage_notes([r for r in train_rows if r["id"] not in evaluated], catalog)
 
     out_dir = OUTPUT_ROOT / "runs" / args.split / args.name
     llm_log = LLMCallLog(out_dir / "llm_calls.jsonl")  # every request/response, browsable in lab/app.py
     t0 = time.time()
     results = run_split(args.split, DATA_ROOT, rows, catalog, transcripts, fewshots, cfg, client, args.workers, llm_log,
-                        tool_apps=tool_apps, param_notes=param_notes)
+                        tool_apps=tool_apps, param_notes=param_notes, param_notes_by_id=param_notes_by_id)
     elapsed = time.time() - t0
 
     write_submission(out_dir / "submission.jsonl", rows, results)

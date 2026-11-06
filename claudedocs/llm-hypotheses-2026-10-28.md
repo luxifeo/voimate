@@ -127,6 +127,15 @@ Cấu hình: gipformer 1.5 ASR + Qwen3.5-4B, `--fewshot 8 --arg-guide --date-tab
 - Đường dẫn: `outputs/runs/public_test/c1_combo_gip15/submission.jsonl`, sinh bằng `scripts/run_agent.py` trên server vLLM dev.
 - Kết quả chạy: 634 dòng, 0 lỗi schema (`zaic_tools --validate`), 0 lỗi agent, 4.43 s/sample.
 - So với run public trước (`qwen35_4b_gip15`): cùng state_hash 476/634, cùng tool call 253/634.
+- **Điểm public LB: 47.39** (run trước 44.92, tăng +2.47). Trên dev 300 ASR, mức tăng là +7.38.
+
+Giải thích khả dĩ cho mức tăng nhỏ hơn trên public [Inference]:
+
+- 41% mẫu public (262/634) gọi ít nhất một app chỉ có ở public_test. Có 11 app như vậy, gồm 34 tool.
+- Không tool nào trong 34 tool đó có ghi chú tham số, vì `param_usage_notes` chỉ học từ nhãn train.
+- Few-shot cũng không thể có ví dụ gọi đúng các tool đó.
+- Vì vậy, với các mẫu này, cấu hình kết hợp chỉ còn tác dụng của ARG_RULE chung và bảng ngày.
+- Dev 300 lấy từ train nên không có hiện tượng app mới này. Kết quả là dev đánh giá cao hơn thực tế.
 
 ### Docker `lifemate-submission:combo`
 

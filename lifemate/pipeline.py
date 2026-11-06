@@ -110,14 +110,17 @@ def param_usage_notes(train_rows: list[dict], catalog: dict, min_uses: int = 5) 
 def run_split(split: str, root: Path, rows: list[dict], catalog: dict, transcripts: dict[str, str],
               fewshots: dict[str, list[str]], cfg: AgentConfig, client: OpenAI, workers: int = 32,
               llm_log: LLMCallLog | None = None, tool_apps: dict[str, set[str] | None] | None = None,
-              param_notes: dict[str, dict[str, str]] | None = None) -> dict[str, tuple]:
-    """{sample_id: (tool_calls, state_hash, info)} with exactly one ToolEnv per sample."""
+              param_notes: dict[str, dict[str, str]] | None = None,
+              param_notes_by_id: dict[str, dict[str, dict[str, str]]] | None = None) -> dict[str, tuple]:
+    """{sample_id: (tool_calls, state_hash, info)} with exactly one ToolEnv per sample.
+    param_notes_by_id overrides param_notes per sample (k-fold notes when evaluating on the whole train split)."""
     def infer(item):
         env = new_env(split, item["id"], root)
+        notes = param_notes_by_id[item["id"]] if param_notes_by_id is not None else param_notes
         try:
             res = run_agent(client, cfg, item, env, catalog, transcripts, fewshots.get(item["id"], []),
                             audio_path=root / split / item["audio"], llm_log=llm_log,
-                            apps=(tool_apps or {}).get(item["id"]), param_notes=param_notes)
+                            apps=(tool_apps or {}).get(item["id"]), param_notes=notes)
             return item["id"], res.tool_calls, res.state_hash, {"trace": res.trace, "stop": res.stop_reason}
         except Exception as e:  # keep the calls already made: they are part of the submission
             return item["id"], env.get_tool_calls(), env.get_state_hash(), {"error": f"{type(e).__name__}: {e}"}
